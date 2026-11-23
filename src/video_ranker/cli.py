@@ -8,6 +8,7 @@ def main() -> None:
     sub.add_parser("init-db", help="enable pgvector and create tables")
     ingest = sub.add_parser("ingest", help="download and register one or more videos")
     ingest.add_argument("urls", nargs="+")
+    sub.add_parser("keyframes", help="extract keyframes for downloaded videos")
 
     args = parser.parse_args()
 
@@ -24,6 +25,11 @@ def main() -> None:
                 print(f"{url} -> video {ingest_url(url)}")
             except Exception as exc:
                 print(f"{url} -> FAILED: {exc}")
+    elif args.command == "keyframes":
+        from video_ranker.ingest.pipeline import keyframes_for_pending
+
+        for video_id, count in keyframes_for_pending():
+            print(f"video {video_id} -> {count} keyframes")
 
 
 if __name__ == "__main__":

@@ -1,12 +1,15 @@
+import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 from sqlalchemy import select
 
 from video_ranker.config import get_settings
-from video_ranker.db.models import Video, VideoStatus
+from video_ranker.db.models import Keyframe, Video, VideoStatus
 from video_ranker.db.session import SessionLocal
 from video_ranker.ingest.download import download_video
-from video_ranker.storage import ensure_bucket, upload_file
+from video_ranker.ingest.keyframes import extract_keyframes
+from video_ranker.storage import download_file, ensure_bucket, upload_file
 
 
 def ingest_url(url: str) -> int:
@@ -43,3 +46,31 @@ def ingest_url(url: str) -> int:
 
         session.commit()
         return video.id
+
+
+def extract_video_keyframes(video_id: int) -> int:
+    """Pull a video from S3, extract keyframes, upload them and store the rows."""
+    with SessionLocal() as session, tempfile.TemporaryDirectory() as tmp:
+        video = session.get(Video, video_id)
+        if video is None or video.video_key is None:
+            raise ValueError(f"video {video_id} has no stored file")
+
+        local = download_file(video.video_key, Path(tmp) / "video.mp4")
+        frames = extract_keyframes(local, Path(tmp) / "frames")
+
+        video.keyframes.clear()
+        for timestamp, path in frames:
+            key = upload_file(path, f"keyframes/{video.id}/{path.name}")
+            video.keyframes.append(Keyframe(timestamp_s=timestamp, image_key=key))
+        session.commit()
+        return len(frames)
+
+
+def keyframes_for_pending() -> Iterator[tuple[int, int]]:
+    """Extract keyframes for every downloaded video that doesn't have any yet."""
+    with SessionLocal() as session:
+        ids = session.scalars(
+            select(Video.id).where(Video.status == VideoStatus.DOWNLOADED, ~Video.keyframes.any())
+        ).all()
+    for video_id in ids:
+        yield video_id, extract_video_keyframes(video_id)

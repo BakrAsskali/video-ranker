@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     data_dir: str = "data"
     embedding_dim: int = 768
 
+    whisper_model: str = "small"
+    whisper_device: str = "auto"
+    whisper_compute: str = "auto"
+    hf_token: str = ""
+
     @property
     def database_url(self) -> str:
         return (

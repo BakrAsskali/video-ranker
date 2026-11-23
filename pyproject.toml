@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = [
+    "faster-whisper>=1.1",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
 ]

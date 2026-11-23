@@ -24,6 +24,7 @@ def download_video(url: str, out_dir: Path, max_height: int = 720) -> DownloadRe
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
+        "noprogress": True,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)

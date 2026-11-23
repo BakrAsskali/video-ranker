@@ -9,6 +9,7 @@ def main() -> None:
     ingest = sub.add_parser("ingest", help="download and register one or more videos")
     ingest.add_argument("urls", nargs="+")
     sub.add_parser("keyframes", help="extract keyframes for downloaded videos")
+    sub.add_parser("transcribe", help="transcribe audio for downloaded videos")
 
     args = parser.parse_args()
 
@@ -30,6 +31,11 @@ def main() -> None:
 
         for video_id, count in keyframes_for_pending():
             print(f"video {video_id} -> {count} keyframes")
+    elif args.command == "transcribe":
+        from video_ranker.ingest.pipeline import transcribe_pending
+
+        for video_id, count in transcribe_pending():
+            print(f"video {video_id} -> {count} segments")
 
 
 if __name__ == "__main__":

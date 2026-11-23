@@ -1,3 +1,4 @@
+import json
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -5,11 +6,12 @@ from pathlib import Path
 from sqlalchemy import select
 
 from video_ranker.config import get_settings
-from video_ranker.db.models import Keyframe, Video, VideoStatus
+from video_ranker.db.models import Keyframe, Transcript, Video, VideoStatus
 from video_ranker.db.session import SessionLocal
 from video_ranker.ingest.download import download_video
 from video_ranker.ingest.keyframes import extract_keyframes
-from video_ranker.storage import download_file, ensure_bucket, upload_file
+from video_ranker.ingest.transcribe import TranscriptResult, extract_audio, has_audio, transcribe
+from video_ranker.storage import download_file, ensure_bucket, upload_bytes, upload_file
 
 
 def ingest_url(url: str) -> int:
@@ -74,3 +76,34 @@ def keyframes_for_pending() -> Iterator[tuple[int, int]]:
         ).all()
     for video_id in ids:
         yield video_id, extract_video_keyframes(video_id)
+
+
+def transcribe_video(video_id: int) -> int:
+    """Transcribe a stored video. Full text goes to Postgres, timed segments to S3 as JSON."""
+    with SessionLocal() as session, tempfile.TemporaryDirectory() as tmp:
+        video = session.get(Video, video_id)
+        if video is None or video.video_key is None:
+            raise ValueError(f"video {video_id} has no stored file")
+
+        local = download_file(video.video_key, Path(tmp) / "video.mp4")
+        if has_audio(local):
+            result = transcribe(extract_audio(local, Path(tmp) / "audio.wav"))
+        else:
+            result = TranscriptResult(language=None)
+
+        payload = [vars(s) for s in result.segments]
+        upload_bytes(json.dumps(payload).encode(), f"transcripts/{video.id}.json")
+
+        video.transcript = Transcript(language=result.language, text=result.text)
+        session.commit()
+        return len(result.segments)
+
+
+def transcribe_pending() -> Iterator[tuple[int, int]]:
+    """Transcribe every downloaded video that has no transcript yet."""
+    with SessionLocal() as session:
+        ids = session.scalars(
+            select(Video.id).where(Video.status == VideoStatus.DOWNLOADED, ~Video.transcript.has())
+        ).all()
+    for video_id in ids:
+        yield video_id, transcribe_video(video_id)

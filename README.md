@@ -18,7 +18,7 @@ src/video_ranker/
   config.py          settings loaded from .env
   storage.py         S3 helpers
   db/                SQLAlchemy models and session
-  ingest/            download + registration pipeline
+  ingest/            download, keyframes, transcription
   cli.py             command-line entry point
 tests/
 docker-compose.yml   Postgres, S3, Redis

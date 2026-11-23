@@ -33,6 +33,11 @@ def upload_file(path: Path, key: str, bucket: str | None = None) -> str:
     return key
 
 
+def upload_bytes(data: bytes, key: str, bucket: str | None = None) -> str:
+    s3_client().put_object(Bucket=bucket or get_settings().s3_bucket, Key=key, Body=data)
+    return key
+
+
 def download_file(key: str, path: Path, bucket: str | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     s3_client().download_file(bucket or get_settings().s3_bucket, key, str(path))

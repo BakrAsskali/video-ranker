@@ -107,3 +107,40 @@ def transcribe_pending() -> Iterator[tuple[int, int]]:
         ).all()
     for video_id in ids:
         yield video_id, transcribe_video(video_id)
+
+
+def embed_video(video_id: int) -> int:
+    """Fill in SigLIP embeddings for a video's keyframes and transcript."""
+    from video_ranker.ingest.embed import embed_document, embed_images
+
+    with SessionLocal() as session, tempfile.TemporaryDirectory() as tmp:
+        video = session.get(Video, video_id)
+        if video is None:
+            raise ValueError(f"video {video_id} not found")
+
+        frames = [k for k in video.keyframes if k.embedding is None]
+        if frames:
+            paths = [download_file(k.image_key, Path(tmp) / f"{k.id}.jpg") for k in frames]
+            for frame, vec in zip(frames, embed_images(paths), strict=True):
+                frame.embedding = vec.tolist()
+
+        tr = video.transcript
+        if tr is not None and tr.embedding is None:
+            vec = embed_document(tr.text)
+            if vec is not None:
+                tr.embedding = vec.tolist()
+
+        session.commit()
+        return len(frames)
+
+
+def embed_pending() -> Iterator[tuple[int, int]]:
+    with SessionLocal() as session:
+        ids = session.scalars(
+            select(Video.id).where(
+                Video.keyframes.any(Keyframe.embedding.is_(None))
+                | Video.transcript.has(Transcript.embedding.is_(None))
+            )
+        ).all()
+    for video_id in ids:
+        yield video_id, embed_video(video_id)

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     whisper_compute: str = "auto"
     hf_token: str = ""
 
+    clip_model: str = "hf-hub:timm/ViT-B-16-SigLIP"
+
     @property
     def database_url(self) -> str:
         return (

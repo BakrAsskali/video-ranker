@@ -11,6 +11,7 @@ def main() -> None:
     sub.add_parser("keyframes", help="extract keyframes for downloaded videos")
     sub.add_parser("transcribe", help="transcribe audio for downloaded videos")
     sub.add_parser("embed", help="embed keyframes and transcripts")
+    sub.add_parser("caption", help="caption a few keyframes per video with a small VLM")
 
     args = parser.parse_args()
 
@@ -42,6 +43,11 @@ def main() -> None:
 
         for video_id, count in embed_pending():
             print(f"video {video_id} -> {count} frames embedded")
+    elif args.command == "caption":
+        from video_ranker.ingest.pipeline import caption_pending
+
+        for video_id, count in caption_pending():
+            print(f"video {video_id} -> {count} captions")
 
 
 if __name__ == "__main__":

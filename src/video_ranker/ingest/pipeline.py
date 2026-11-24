@@ -144,3 +144,32 @@ def embed_pending() -> Iterator[tuple[int, int]]:
         ).all()
     for video_id in ids:
         yield video_id, embed_video(video_id)
+
+
+def caption_video(video_id: int, k: int = 4) -> int:
+    """Caption a handful of evenly spread keyframes with the VLM."""
+    from video_ranker.ingest.caption import caption_images, pick_frames
+
+    with SessionLocal() as session, tempfile.TemporaryDirectory() as tmp:
+        video = session.get(Video, video_id)
+        if video is None:
+            raise ValueError(f"video {video_id} not found")
+
+        frames = sorted(video.keyframes, key=lambda f: f.timestamp_s)
+        chosen = [frames[i] for i in pick_frames(len(frames), k)]
+        paths = [download_file(f.image_key, Path(tmp) / f"{f.id}.jpg") for f in chosen]
+        for frame, text in zip(chosen, caption_images(paths), strict=True):
+            frame.caption = text
+        session.commit()
+        return len(chosen)
+
+
+def caption_pending() -> Iterator[tuple[int, int]]:
+    with SessionLocal() as session:
+        ids = session.scalars(
+            select(Video.id).where(
+                Video.keyframes.any(), ~Video.keyframes.any(Keyframe.caption.is_not(None))
+            )
+        ).all()
+    for video_id in ids:
+        yield video_id, caption_video(video_id)

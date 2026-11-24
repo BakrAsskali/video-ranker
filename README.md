@@ -18,7 +18,7 @@ src/video_ranker/
   config.py          settings loaded from .env
   storage.py         S3 helpers
   db/                SQLAlchemy models and session
-  ingest/            download, keyframes, transcription, embeddings
+  ingest/            download, keyframes, transcription, embeddings, captions
   cli.py             command-line entry point
 tests/
 docker-compose.yml   Postgres, S3, Redis
@@ -34,7 +34,7 @@ docker compose up -d --wait
 uv sync                           # add --extra ml for PyTorch + CUDA
 uv run video-ranker init-db
 uv run video-ranker ingest "https://www.youtube.com/watch?v=..."
-uv run video-ranker keyframes && uv run video-ranker transcribe && uv run video-ranker embed
+uv run video-ranker keyframes && uv run video-ranker transcribe && uv run video-ranker embed && uv run video-ranker caption
 ```
 
 Run the checks:

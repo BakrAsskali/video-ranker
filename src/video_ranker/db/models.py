@@ -51,6 +51,7 @@ class Keyframe(Base):
     video_id: Mapped[int] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"), index=True)
     timestamp_s: Mapped[float]
     image_key: Mapped[str] = mapped_column(String(512))
+    caption: Mapped[str | None] = mapped_column(Text)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
 
     video: Mapped[Video] = relationship(back_populates="keyframes")

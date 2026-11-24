@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     hf_token: str = ""
 
     clip_model: str = "hf-hub:timm/ViT-B-16-SigLIP"
+    caption_model: str = "HuggingFaceTB/SmolVLM-500M-Instruct"
 
     @property
     def database_url(self) -> str:

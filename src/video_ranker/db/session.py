@@ -13,3 +13,6 @@ def init_db() -> None:
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(engine)
+    # columns added after the first release
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE keyframes ADD COLUMN IF NOT EXISTS caption text"))

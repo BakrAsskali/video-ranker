@@ -34,7 +34,8 @@ docker compose up -d --wait
 uv sync                           # add --extra ml for PyTorch + CUDA
 uv run video-ranker init-db
 uv run video-ranker ingest "https://www.youtube.com/watch?v=..."
-uv run video-ranker keyframes && uv run video-ranker transcribe && uv run video-ranker embed && uv run video-ranker caption
+uv run video-ranker process       # keyframes, transcript, embeddings, captions -> records/{id}.json
+uv run video-ranker record 1      # print the full record of a video
 ```
 
 Run the checks:

@@ -10,8 +10,15 @@ from video_ranker.db.models import Keyframe, Transcript, Video, VideoStatus
 from video_ranker.db.session import SessionLocal
 from video_ranker.ingest.download import download_video
 from video_ranker.ingest.keyframes import extract_keyframes
+from video_ranker.ingest.record import build_record
 from video_ranker.ingest.transcribe import TranscriptResult, extract_audio, has_audio, transcribe
-from video_ranker.storage import download_file, ensure_bucket, upload_bytes, upload_file
+from video_ranker.storage import (
+    download_bytes,
+    download_file,
+    ensure_bucket,
+    upload_bytes,
+    upload_file,
+)
 
 
 def ingest_url(url: str) -> int:
@@ -173,3 +180,54 @@ def caption_pending() -> Iterator[tuple[int, int]]:
         ).all()
     for video_id in ids:
         yield video_id, caption_video(video_id)
+
+
+def write_record(video_id: int) -> dict:
+    with SessionLocal() as session:
+        video = session.get(Video, video_id)
+        segments = None
+        if video.transcript is not None:
+            segments = json.loads(download_bytes(f"transcripts/{video.id}.json"))
+        rec = build_record(video, segments)
+    upload_bytes(json.dumps(rec, indent=2).encode(), f"records/{video_id}.json")
+    return rec
+
+
+def process_video(video_id: int) -> dict:
+    """Run every missing step for one video, mark it processed and write its record."""
+    with SessionLocal() as session:
+        video = session.get(Video, video_id)
+        has_frames = bool(video.keyframes)
+        has_transcript = video.transcript is not None
+        has_captions = any(f.caption for f in video.keyframes)
+
+    try:
+        if not has_frames:
+            extract_video_keyframes(video_id)
+        if not has_transcript:
+            transcribe_video(video_id)
+        embed_video(video_id)
+        if not has_captions:
+            caption_video(video_id)
+    except Exception as exc:
+        with SessionLocal() as session:
+            video = session.get(Video, video_id)
+            video.status = VideoStatus.FAILED
+            video.error = str(exc)[:2000]
+            session.commit()
+        raise
+
+    with SessionLocal() as session:
+        video = session.get(Video, video_id)
+        video.status = VideoStatus.PROCESSED
+        video.error = None
+        session.commit()
+    return write_record(video_id)
+
+
+def process_pending() -> Iterator[int]:
+    with SessionLocal() as session:
+        ids = session.scalars(select(Video.id).where(Video.status == VideoStatus.DOWNLOADED)).all()
+    for video_id in ids:
+        process_video(video_id)
+        yield video_id

@@ -12,6 +12,9 @@ def main() -> None:
     sub.add_parser("transcribe", help="transcribe audio for downloaded videos")
     sub.add_parser("embed", help="embed keyframes and transcripts")
     sub.add_parser("caption", help="caption a few keyframes per video with a small VLM")
+    sub.add_parser("process", help="run all steps for downloaded videos and write JSON records")
+    record = sub.add_parser("record", help="print the JSON record of one video")
+    record.add_argument("video_id", type=int)
 
     args = parser.parse_args()
 
@@ -48,6 +51,17 @@ def main() -> None:
 
         for video_id, count in caption_pending():
             print(f"video {video_id} -> {count} captions")
+    elif args.command == "process":
+        from video_ranker.ingest.pipeline import process_pending
+
+        for video_id in process_pending():
+            print(f"video {video_id} -> processed, records/{video_id}.json")
+    elif args.command == "record":
+        import json
+
+        from video_ranker.ingest.pipeline import write_record
+
+        print(json.dumps(write_record(args.video_id), indent=2))
 
 
 if __name__ == "__main__":

@@ -15,6 +15,9 @@ def main() -> None:
     sub.add_parser("process", help="run all steps for downloaded videos and write JSON records")
     record = sub.add_parser("record", help="print the JSON record of one video")
     record.add_argument("video_id", type=int)
+    enqueue = sub.add_parser("enqueue", help="queue urls (or pending videos) on the celery workers")
+    enqueue.add_argument("urls", nargs="*")
+    enqueue.add_argument("--pending", action="store_true", help="queue all downloaded videos")
 
     args = parser.parse_args()
 
@@ -62,6 +65,22 @@ def main() -> None:
         from video_ranker.ingest.pipeline import write_record
 
         print(json.dumps(write_record(args.video_id), indent=2))
+    elif args.command == "enqueue":
+        from sqlalchemy import select
+
+        from video_ranker.db.models import Video, VideoStatus
+        from video_ranker.db.session import SessionLocal
+        from video_ranker.tasks import process_chain
+
+        for url in args.urls:
+            print(f"{url} -> task {process_chain(url=url).apply_async().id}")
+        if args.pending:
+            with SessionLocal() as session:
+                ids = session.scalars(
+                    select(Video.id).where(Video.status == VideoStatus.DOWNLOADED)
+                ).all()
+            for video_id in ids:
+                print(f"video {video_id} -> task {process_chain(video_id).apply_async().id}")
 
 
 if __name__ == "__main__":

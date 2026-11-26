@@ -19,6 +19,7 @@ src/video_ranker/
   storage.py         S3 helpers
   db/                SQLAlchemy models and session
   ingest/            download, keyframes, transcription, embeddings, captions
+  tasks.py           celery app, one task per pipeline step
   cli.py             command-line entry point
 tests/
 docker-compose.yml   Postgres, S3, Redis
@@ -36,6 +37,17 @@ uv run video-ranker init-db
 uv run video-ranker ingest "https://www.youtube.com/watch?v=..."
 uv run video-ranker process       # keyframes, transcript, embeddings, captions -> records/{id}.json
 uv run video-ranker record 1      # print the full record of a video
+```
+
+### Queue
+
+Each step is also a Celery task. Download and keyframes run on the default queue, the model steps
+(transcribe, embed, caption) on a `gpu` queue with a single worker so models load once.
+
+```bash
+uv run --extra ml celery -A video_ranker.tasks worker -Q celery -c 2 -n cpu@%h
+uv run --extra ml celery -A video_ranker.tasks worker -Q gpu -P solo -n gpu@%h
+uv run video-ranker enqueue "https://www.youtube.com/watch?v=..."   # or --pending
 ```
 
 Run the checks:
